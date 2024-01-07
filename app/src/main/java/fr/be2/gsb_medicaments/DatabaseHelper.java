@@ -1,7 +1,6 @@
 package fr.be2.gsb_medicaments;
 
 import android.content.Context;
-import android.content.res.AssetManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
@@ -10,12 +9,14 @@ import android.util.Log;
 import android.widget.Toast;
 
 import java.io.File;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.regex.Pattern;
 
 public class DatabaseHelper extends SQLiteOpenHelper {
 
@@ -25,7 +26,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     private static final int DATABASE_VERSION = 2;
     private String DATABASE_PATH;
 
-    private static final String PREMIERE_VOIE = "Séléctionnez une voie d'administration";
+    private static final String PREMIERE_VOIE = "Choisir une voie d'administration";
     private static DatabaseHelper sInstance;
 
     public static synchronized DatabaseHelper getInstance(Context context) {
@@ -69,7 +70,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         List<String> voiesAdminList = new ArrayList<>();
 
         SQLiteDatabase db = this.getReadableDatabase();
-        Cursor cursor = db.rawQuery("SELECT DISTINCT Voies_dadministration FROM CIS_bdpm WHERE Voies_dadministration NOT LIKE '%;%' ORDER BY Voies_dadministration", null);
+        Cursor cursor = db.rawQuery("SELECT DISTINCT UPPER( Voies_dadministration) FROM CIS_bdpm WHERE Voies_dadministration NOT LIKE '%;%' ORDER BY Voies_dadministration", null);
         voiesAdminList.add(PREMIERE_VOIE);
         if (cursor.moveToFirst()) {
             do {
@@ -98,21 +99,22 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         selectionArgs.add("%" + denomination + "%");
         selectionArgs.add("%" + formePharmaceutique + "%");
         selectionArgs.add( "%" + titulaires + "%");
-        selectionArgs.add( "%" + denominationSubstance + "%");
+        selectionArgs.add( "%" + removeAccents(denominationSubstance) + "%");
         SQLiteDatabase db = this.getReadableDatabase();
         String finSQL ="";
 
         if (!voiesAdmin.equals(PREMIERE_VOIE)){
-            finSQL ="AND  Voies_dadministration = ?";
-            selectionArgs.add(voiesAdmin);
+            finSQL ="AND Voies_dadministration LIKE ?";
+            selectionArgs.add("%"+voiesAdmin+"%");
         }
+        String SQLSubstance ="SELECT CODE_CIS FROM CIS_COMPO_bdpm WHERE replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(upper(Denomination_substance), 'Â','A'),'Ä','A'),'À','A'),'É','E'),'Á','A'),'Ï','I'), 'Ê','E'),'È','E'),'Ô','O'),'Ü','U'), 'Ç','C' ) LIKE ?" ;
 
         // La requête SQL de recherche
         String query = "SELECT * FROM CIS_bdpm WHERE " +
                 "Denomination_du_medicament LIKE ? AND " +
                 "Forme_pharmaceutique LIKE ? AND " +
                 "Titulaires LIKE ? AND " +
-                "Code_CIS IN (SELECT Code_CIS FROM CIS_COMPO_bdpm WHERE Designation_element LIKE ?) " +
+                "Code_CIS IN ("+SQLSubstance+") " +
                 finSQL;
 
         // Les valeurs à remplacer dans la requête
@@ -130,6 +132,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 String formePharmaceutiqueMedicament = cursor.getString(cursor.getColumnIndex("Forme_pharmaceutique"));
                 String voiesAdminMedicament = cursor.getString(cursor.getColumnIndex("Voies_dadministration"));
                 String titulairesMedicament = cursor.getString(cursor.getColumnIndex("Titulaires"));
+                String StatutAdministratifMedicament = cursor.getString(cursor.getColumnIndex("Statut_administratif_de_lAMM"));
 
                 // Créer un objet Medicament avec les valeurs récupérées
                 Medicament medicament = new Medicament();
@@ -138,6 +141,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 medicament.setFormePharmaceutique(formePharmaceutiqueMedicament);
                 medicament.setVoiesAdmin(voiesAdminMedicament);
                 medicament.setTitulaires(titulairesMedicament);
+                medicament.setStatutAdministratif(StatutAdministratifMedicament);
+
 
                 // Ajouter l'objet Medicament à la liste
                 medicamentList.add(medicament);
@@ -206,7 +211,26 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             // bdd n'existe pas
         }
 
+
+    }
+    private String removeAccents(String input) {
+        if (input == null) {
+            return null;
+        }
+
+        // Normalisation en forme de décomposition (NFD)
+        String normalized = Normalizer.normalize(input, Normalizer.Form.NFD);
+
+        // Remplacement des caractères diacritiques
+        Pattern pattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
+        return pattern.matcher(normalized).replaceAll("");
     }
 
-
 }
+
+
+
+
+
+
+
