@@ -28,12 +28,14 @@
         android:id="@+id/key"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="clé"/>
+        android:hint="clé secrète"/>
     <Button
         android:id="@+id/valider2"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:onClick="CompareCle"
         android:text="Valider"/>
 
 </LinearLayout>
+
 </LinearLayout>
